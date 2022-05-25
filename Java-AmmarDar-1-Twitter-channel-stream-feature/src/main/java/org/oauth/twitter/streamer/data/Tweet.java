@@ -48,29 +48,27 @@ public class Tweet implements Comparable<Tweet> {
         this.creationDate = creationDate;
     }
 
-    public Author getUser() {
+    public Author getAuthor() {
         return author;
     }
 
-    public void setUser(Author author) {
+    public void setAuthor(Author author) {
         this.author = author;
     }
 
+
     @Override
-    public int compareTo(Tweet o) {
-        if(this == o)
-            return 0;
-        else
-            return this.getCreationDate().compareTo(o.getCreationDate());
+    public int compareTo(@NotNull Tweet o) {
+        return this.getCreationDate().compareTo(o.creationDate);
     }
 
     @Override
     public String toString(){
         return "Tweet: [" +
-                TweetKeywords.MESSAGE_ID + ": " + getMessageID() + "," +
-                TweetKeywords.CREATION_DATE + ": " + getCreationDate() + "," +
-                TweetKeywords.TEXT + ": " + getText() + "," +
-                TweetKeywords.AUTHOR + ": " + getUser().toString() +
+                TweetKeywords.MESSAGE_ID + ": " + messageID + "," +
+                TweetKeywords.CREATION_DATE + ": " + creationDate + "," +
+                TweetKeywords.TEXT + ": " + text + "," +
+                TweetKeywords.AUTHOR + ": " + author.toString() +
                 "]";
     }
 

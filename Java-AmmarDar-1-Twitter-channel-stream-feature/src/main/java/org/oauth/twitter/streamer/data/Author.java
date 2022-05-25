@@ -3,6 +3,7 @@ package org.oauth.twitter.streamer.data;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Date;
 
@@ -10,7 +11,7 @@ import java.util.Date;
  * Tweet user class.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class Author {
+public class Author implements Comparable<Author> {
 
     @JsonProperty(TweetKeywords.AUTHOR_ID)
     private String authorID;
@@ -55,15 +56,20 @@ public class Author {
         this.creationDate = creationDate;
     }
 
+    @Override
+    public int compareTo(@NotNull Author o) {
+        if (this.getAuthorID().equals(o.getAuthorID()))
+            return 0;
+        return this.getCreationDate().compareTo(o.creationDate);
+    }
 
     @Override
     public String toString(){
         return "Author: [" +
-                TweetKeywords.AUTHOR_ID + ": " + getAuthorID() + "," +
+                TweetKeywords.AUTHOR_ID + ": " + authorID + "," +
                 TweetKeywords.CREATION_DATE + ": " + creationDate + "," +
-                TweetKeywords.AUTHOR_NAME + ": " + name + "," +
-                TweetKeywords.AUTHOR_SCREEN_NAME + ": " + screenName +
+                TweetKeywords.AUTHOR_NAME + ": " + name +
                 "]";
-    }
 
+    }
 }
