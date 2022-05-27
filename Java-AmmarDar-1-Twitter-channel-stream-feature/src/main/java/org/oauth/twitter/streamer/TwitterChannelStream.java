@@ -11,5 +11,5 @@ public abstract class TwitterChannelStream {
 
     public abstract void retrieveTweets(HttpRequestFactory httpRequestFactory) throws IOException;
 
-    public abstract void processTweets();
+    public abstract void processTweets() throws IOException;;
 }

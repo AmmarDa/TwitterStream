@@ -28,56 +28,58 @@ public class TwitterChannelStreamImpl extends TwitterChannelStream {
     private static final GenericUrl END_POINT =
             new GenericUrl("https://stream.twitter.com/1.1/statuses/filter.json?track=bieber");
 
-    private List<Tweet> tweets;
+    protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    private Map<Author, List<Tweet>> tweetByUser;
+    protected List<Tweet> tweets;
+
+    protected Map<Author, List<Tweet>> tweetsByAuthor;
 
     private static final String TIMEOUT_MILLI_SECONDS = "TIMEOUT_MILLI_SECONDS";
     private static final String MESSAGES_THRESHOLD = "MESSAGES_THRESHOLD";
 
-    final private int timeout;
-    final private int messageThreshold;
+    private int timeout;
+    private int messageThreshold;
 
-    public TwitterChannelStreamImpl(@NotNull final String propertiesFileName) {
+    public TwitterChannelStreamImpl(@NotNull final String propertiesFileName) throws IOException {
         Properties properties = loadPropertiesFile(propertiesFileName);
         timeout = Integer.parseInt(properties.getProperty(TIMEOUT_MILLI_SECONDS));
         messageThreshold = Integer.parseInt(properties.getProperty(MESSAGES_THRESHOLD));
+
     }
 
-    /**
+    /***
+     /**
      * Load the properties file that contains parameters of the stream channel
      * @param propertiesFileName The properties file relative path
      * @return Return the properties file
+     * @throws IOException Throw IOException if the Property file isn't loaded
      */
-    private Properties loadPropertiesFile(final String propertiesFileName) {
+    private Properties loadPropertiesFile(final String propertiesFileName) throws IOException {
         InputStream iStream = null;
         try {
             iStream = Files.newInputStream(Paths.get(propertiesFileName));
             Properties properties = new Properties();
             properties.load(iStream);
             return properties;
-        } catch (IOException e) {
-            LOGGER.error(e.getMessage());
         } finally {
             try {
                 if(iStream != null){
                     iStream.close();
                 }
             } catch (IOException e) {
-                LOGGER.error(e.getMessage());
+                throw new IOException("Properties file: " + propertiesFileName + "can't be closed", e);
             }
         }
-        return null;
     }
 
     /**
      * Collect tweets from the specified Twitter end point.
      * @param httpRequestFactory Request to the end point.
      * @return List of tweets that match the specified conditions
-     * @throws IOException
+     * @throws IOException Throw IOException if the end point status is not OK.
      */
     @Override
-    public void retrieveTweets(final HttpRequestFactory httpRequestFactory) throws IOException {
+    public void retrieveTweets(HttpRequestFactory httpRequestFactory) throws IOException {
         HttpRequest request = httpRequestFactory.buildGetRequest(END_POINT);
         HttpResponse response = request.execute();
         if (response.getStatusCode() != 200) {
@@ -95,22 +97,31 @@ public class TwitterChannelStreamImpl extends TwitterChannelStream {
      * @param is InputStream to the endpoint
      * @param timeoutMillis Timeout
      * @return List of Tweets
-     * @throws IOException
+     * @throws IOException Throw IOException if we can't read from the endpoint throw the buffer reader.
      */
     private List<Tweet> readTweetsFromInputStream(@NotNull InputStream is, int timeoutMillis)
             throws IOException  {
         BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(is));
-        ObjectMapper objectMapper = new ObjectMapper();
         List<Tweet> tweets = new ArrayList<>();
         long maxMilliSeconds = System.currentTimeMillis() + timeoutMillis;
         int msgsCounter = 0;
         while(bufferedReader.ready() && msgsCounter < messageThreshold &&
                 System.currentTimeMillis() < maxMilliSeconds) {
             String message = bufferedReader.readLine();
-            tweets.add(objectMapper.readValue(message, Tweet.class));
+            tweets.add(OBJECT_MAPPER.readValue(message, Tweet.class));
             msgsCounter++;
         }
         return tweets;
+    }
+
+    protected void sortTweetsByUsersCreationDate() {
+        tweetsByAuthor = tweets.stream()
+                .sorted(Comparator.comparing(p -> p.getAuthor().getCreationDate()))
+                .collect(Collectors.groupingBy(Tweet::getAuthor, LinkedHashMap::new, Collectors.toList()));
+
+        for (List<Tweet> userTweetList : tweetsByAuthor.values()) {
+            userTweetList.sort((p1, p2) -> p1.compareTo(p2));
+        }
     }
 
 
@@ -123,16 +134,10 @@ public class TwitterChannelStreamImpl extends TwitterChannelStream {
      * -------------------
      */
     @Override
-    public void processTweets() {
-        tweetByUser = tweets.stream()
-                .sorted(Comparator.comparing(p -> p.getAuthor().getCreationDate())).
-                        collect(Collectors.groupingBy(Tweet::getAuthor, LinkedHashMap::new, Collectors.toList()));
-
-        for (List<Tweet> userTweetList : tweetByUser.values()) {
-            userTweetList.sort((p1, p2) -> p1.compareTo(p2));
-        }
-        Iterator<Author> users =  tweetByUser.keySet().iterator();
-        for (List<Tweet> userTweetList : tweetByUser.values()) {
+    public void processTweets() throws IOException {
+        sortTweetsByUsersCreationDate();
+        Iterator<Author> users =  tweetsByAuthor.keySet().iterator();
+        for (List<Tweet> userTweetList : tweetsByAuthor.values()) {
             if (users.hasNext())
                 LOGGER.info(users.next().toString() + "\n");
             for(Tweet tweet: userTweetList) {
